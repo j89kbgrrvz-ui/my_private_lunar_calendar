@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>阴历日历订阅生成器</title>
+<script src="lunar.js"></script>
+<style>
+  :root{
+    --bg:#ffffff; --panel:#f7f9fc; --border:#e3e8ef; --text:#1f2733;
+    --muted:#6b7785; --accent:#2f6fed; --accent-d:#1f54c0; --danger:#e74c3c;
+    --ok:#27ae60; --shadow:0 1px 3px rgba(20,30,50,.08);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+  header{background:linear-gradient(120deg,#2f6fed,#5b8def);color:#fff;padding:18px 24px}
+  header h1{margin:0;font-size:20px;font-weight:600}
+  header p{margin:4px 0 0;opacity:.9;font-size:13px}
+  .wrap{max-width:980px;margin:0 auto;padding:20px 24px 60px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    padding:16px 18px;margin-bottom:18px;box-shadow:var(--shadow)}
+  .card h2{margin:0 0 12px;font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .card h2 .tag{font-size:11px;background:var(--accent);color:#fff;border-radius:6px;padding:1px 7px;font-weight:500}
+  label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+  input[type=text],input[type=number],textarea,select{
+    width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;
+    background:#fff;color:var(--text);font-size:14px;font-family:inherit}
+  textarea{resize:vertical;min-height:54px}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row > div{flex:1;min-width:140px}
+  .inline{display:flex;align-items:center;gap:8px;margin-top:10px}
+  .inline input[type=checkbox]{width:16px;height:16px}
+  .swatches{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .sw{width:22px;height:22px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--border);cursor:pointer}
+  .sw.active{box-shadow:0 0 0 2px var(--accent)}
+  .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  button{cursor:pointer;border:none;border-radius:8px;padding:9px 16px;font-size:14px;font-weight:500;
+    background:var(--accent);color:#fff;transition:.15s}
+  button:hover{background:var(--accent-d)}
+  button.ghost{background:#fff;color:var(--accent);border:1px solid var(--accent)}
+  button.ghost:hover{background:#eef3ff}
+  button.danger{background:#fff;color:var(--danger);border:1px solid var(--danger)}
+  button.danger:hover{background:#fdecea}
+  button.sm{padding:5px 10px;font-size:12px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--border)}
+  th{color:var(--muted);font-weight:600;font-size:12px}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .empty{color:var(--muted);text-align:center;padding:18px}
+  .form-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:18px}
+  .preview-item{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:#fff}
+  .preview-item .t{font-weight:600;margin-bottom:4px}
+  .dates{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .chip{background:#eef3ff;color:var(--accent-d);border-radius:6px;padding:2px 8px;font-size:12px}
+  .skip{color:var(--muted);font-size:12px}
+  .hint{color:var(--muted);font-size:12px;margin-top:6px}
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1f2733;color:#fff;
+    padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;transition:.25s;pointer-events:none}
+  .toast.show{opacity:1}
+  .note{background:#fff8e6;border:1px solid #ffe2a8;color:#8a6d1b;border-radius:8px;padding:10px 12px;font-size:12.5px;margin-bottom:14px}
+  code{background:#eef1f6;padding:1px 5px;border-radius:4px;font-size:12.5px}
+</style>
+</head>
+<body>
+<header>
+  <h1>阴历日历订阅生成器</h1>
+  <p>添加「庙会 / 节日」等阴历日期，自动逐年换算成公历，生成可订阅的 .ics 日历文件。支持可视化增删改与导入导出。</p>
+</header>
+<div class="wrap">
+
+  <div class="note">
+    提示：默认的 3 条「庙会」只是示例，请在下方把它们改成你自己的真实日期，或直接删除后新增。阴历日期每年对应的公历都不同，本工具会自动换算。
+  </div>
+
+  <!-- 设置 -->
+  <div class="card">
+    <h2>日历设置 <span class="tag">订阅信息</span></h2>
+    <div class="row">
+      <div>
+        <label>日历名称（订阅时显示）</label>
+        <input type="text" id="calName" placeholder="阴历庙会与节日" />
+      </div>
+      <div>
+        <label>开始年份</label>
+        <input type="number" id="startYear" min="1900" max="2100" />
+      </div>
+      <div>
+        <label>结束年份</label>
+        <input type="number" id="endYear" min="1900" max="2100" />
+      </div>
+    </div>
+    <label>日历描述</label>
+    <textarea id="calDesc" placeholder="由 WorkBuddy 生成的阴历日期日历订阅"></textarea>
+  </div>
+
+  <!-- 新增 / 编辑表单 -->
+  <div class="form-card" id="formCard">
+    <h2 id="formTitle">新增阴历事件</h2>
+    <input type="hidden" id="editId" />
+    <div class="row">
+      <div>
+        <label>名称 *</label>
+        <input type="text" id="evName" placeholder="如：龙王庙会" />
+      </div>
+      <div>
+        <label>分类（可选）</label>
+        <input type="text" id="evCat" placeholder="如：庙会" />
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>日期类型</label>
+        <select id="evType">
+          <option value="lunar" selected>阴历（每年公历不同）</option>
+          <option value="solar">公历（每年同月同日）</option>
+        </select>
+      </div>
+      <div>
+        <label>月份</label>
+        <select id="evMonth"></select>
+      </div>
+      <div>
+        <label>日</label>
+        <input type="number" id="evDay" min="1" max="30" value="15" />
+      </div>
+      <div>
+        <label>提前提醒</label>
+        <select id="evRemind">
+          <option value="0">不提醒</option>
+          <option value="1" selected>提前 1 天</option>
+          <option value="2">提前 2 天</option>
+          <option value="3">提前 3 天</option>
+          <option value="7">提前 1 周</option>
+        </select>
+      </div>
+    </div>
+    <div class="inline" id="leapRow">
+      <input type="checkbox" id="evLeap" />
+      <label style="margin:0">闰月（如「闰二月」才勾选；该年若无此闰月则自动跳过）</label>
+    </div>
+    <div class="hint" id="typeHint">阴历：每年对应的公历日期不同，自动换算；公历：每年同一月日重复。</div>
+    <label>备注</label>
+    <textarea id="evDesc" placeholder="补充说明，会写入日程描述"></textarea>
+    <label>颜色</label>
+    <input type="color" id="evColor" value="#e74c3c" style="width:60px;height:34px;padding:2px" />
+    <div class="swatches" id="swatches"></div>
+    <div class="btns">
+      <button id="saveBtn">保存</button>
+      <button class="ghost" id="resetBtn">清空表单</button>
+    </div>
+  </div>
+
+  <!-- 事件列表 -->
+  <div class="card">
+    <h2>事件列表 <span class="tag" id="evCount">0</span></h2>
+    <table>
+      <thead><tr><th>名称</th><th>日期</th><th>分类</th><th>提醒</th><th>颜色</th><th>操作</th></tr></thead>
+      <tbody id="evBody"></tbody>
+    </table>
+    <div class="empty" id="evEmpty">暂无事件，请在上方表单添加。</div>
+  </div>
+
+  <!-- 预览 -->
+  <div class="card">
+    <h2>未来日期预览 <span class="tag">自动换算</span></h2>
+    <div class="hint" id="previewHint">显示从今年起、每条事件最近若干年的公历日期。</div>
+    <div id="preview"></div>
+  </div>
+
+  <!-- 操作 -->
+  <div class="card">
+    <h2>生成与导出</h2>
+    <div class="btns">
+      <button id="genBtn">生成并下载 .ics</button>
+      <button class="ghost" id="copyBtn">复制 .ics 内容</button>
+      <button class="ghost" id="exportBtn">导出配置 JSON</button>
+      <button class="ghost" id="importBtn">导入配置 JSON</button>
+      <input type="file" id="importFile" accept="application/json,.json" style="display:none" />
+      <button class="danger" id="clearAllBtn">清空全部</button>
+    </div>
+    <div class="hint">.ics 下载后，把它放到任意可访问的网址（如 GitHub Pages / 云托管），再用日历 App 的「添加订阅日历」功能订阅该链接即可；修改后重新生成并覆盖上传。</div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- 工具函数（与 Node 版 generate.js 一致） ---------- */
+function cnMonth(m){const map=['正','二','三','四','五','六','七','八','九','十','冬','腊'];return map[(m-1)%12]+'月';}
+function cnDay(n){const d=['日','一','二','三','四','五','六','七','八','九','十'];
+  if(n<=10)return '初'+d[n]; if(n<20)return '十'+d[n-10]; if(n===20)return '二十';
+  if(n<30)return '廿'+d[n-20]; return '三十';}
+function pad(n,w=2){return String(n).padStart(w,'0');}
+function dateValue(dt){return pad(dt.y,4)+pad(dt.m)+pad(dt.d);}
+function addDays(dt,n){const d=new Date(dt.y,dt.m-1,dt.d);d.setDate(d.getDate()+n);return{y:d.getFullYear(),m:d.getMonth()+1,d:d.getDate()};}
+function esc(s){return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n');}
+function fold(line){
+  const enc=new TextEncoder();
+  if(enc.encode(line).length<=75)return line;
+  const out=[];let first=true;let remaining=line;
+  while(remaining.length>0){
+    const limit=first?75:74;let i=0,len=0;
+    while(i<remaining.length){const cb=enc.encode(remaining[i]).length;if(len+cb>limit)break;len+=cb;i++;}
+    out.push((first?'':' ')+remaining.slice(0,i));remaining=remaining.slice(i);first=false;
+  }
+  return out.join('\r\n');
+}
+function lunarToSolar(year,month,day,leap){
+  const m=leap?-month:month;
+  const lm=LunarMonth.fromYm(year,m);
+  if(!lm)return null;
+  if(day>lm.getDayCount())return null;
+  const l=Lunar.fromYmd(year,m,day);const s=l.getSolar();
+  return{y:s.getYear(),m:s.getMonth(),d:s.getDay()};
+}
+function solarToDate(year,month,day){return{y:year,m:month,d:day};}
+// 统一的日期标签
+function dateLabel(ev){
+  if((ev.type||'lunar')==='solar') return '公历'+ev.month+'月'+ev.day+'日';
+  return '农历'+(ev.leap?'闰':'')+cnMonth(ev.month)+cnDay(ev.day);
+}
+function weekday(dt){const w=new Date(dt.y,dt.m-1,dt.d).getDay();return '日一二三四五六'[w];}
+
+function buildICS(config){
+  const cal=config.calendar||{};
+  const name=cal.name||'阴历节日与庙会';
+  const desc=cal.description||'';
+  const startYear=cal.startYear||new Date().getFullYear();
+  const endYear=cal.endYear||(startYear+50);
+  const now=new Date();
+  const stamp=pad(now.getUTCFullYear(),4)+pad(now.getUTCMonth()+1)+pad(now.getUTCDate())+'T'+pad(now.getUTCHours())+pad(now.getUTCMinutes())+pad(now.getUTCSeconds())+'Z';
+  const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//WorkBuddy//Lunar Calendar Generator//CN',
+    'CALSCALE:GREGORIAN','METHOD:PUBLISH',fold('X-WR-CALNAME:'+name)];
+  if(desc)L.push(fold('X-WR-CALDESC:'+desc));
+  L.push('X-WR-TIMEZONE:Asia/Shanghai');
+  let count=0;
+  for(const ev of (config.events||[])){
+    const isLunar=(ev.type||'lunar')==='lunar';
+    const leap=!!ev.leap;
+    for(let y=startYear;y<=endYear;y++){
+      const sd=isLunar?lunarToSolar(y,ev.month,ev.day,leap):solarToDate(y,ev.month,ev.day);
+      if(!sd)continue;
+      const lunarLabel=isLunar?('农历'+(leap?'闰':'')+cnMonth(ev.month)+cnDay(ev.day)):('公历'+ev.month+'月'+ev.day+'日');
+      const uid=(ev.id||('evt-'+ev.name))+'-'+y+'@workbuddy-lunar';
+      L.push('BEGIN:VEVENT','UID:'+uid,'DTSTAMP:'+stamp,'DTSTART;VALUE=DATE:'+dateValue(sd),
+        'DTEND;VALUE=DATE:'+dateValue(addDays(sd,1)),fold('SUMMARY:'+esc(ev.name)));
+      const fullDesc=[esc(ev.description||''),esc(lunarLabel)].filter(Boolean).join('\\n');
+      L.push(fold('DESCRIPTION:'+fullDesc));
+      if(ev.color){L.push('COLOR:'+ev.color);L.push('X-APPLE-CALENDAR-COLOR:'+ev.color);}
+      if(ev.category)L.push(fold('CATEGORIES:'+esc(ev.category)));
+      if(ev.reminderDays&&ev.reminderDays>0){
+        L.push('BEGIN:VALARM','ACTION:DISPLAY',fold('DESCRIPTION:'+esc(ev.name)),'TRIGGER:-P'+ev.reminderDays+'D','END:VALARM');
+      }
+      L.push('END:VEVENT');count++;
+    }
+  }
+  L.push('END:VCALENDAR');
+  return{ics:L.join('\r\n')+'\r\n',count};
+}
+
+/* ---------- 状态与默认数据 ---------- */
+const STORE_KEY='workbuddy_lunar_config';
+const DEFAULT_CONFIG={
+  calendar:{name:'阴历庙会与节日',description:'由 WorkBuddy 生成的阴历日期日历订阅，可手动增删改。',startYear:2024,endYear:2074},
+  events:[
+    {id:'miaohui-yuanxiao',name:'元宵庙会',month:1,day:15,leap:false,description:'农历正月十五，元宵节庙会',reminderDays:1,color:'#e74c3c',category:'庙会'},
+    {id:'miaohui-sanyue san',name:'三月三庙会',month:3,day:3,leap:false,description:'农历三月初三，上巳节庙会',reminderDays:1,color:'#27ae60',category:'庙会'},
+    {id:'miaohui-liuyue liu',name:'六月六庙会',month:6,day:6,leap:false,description:'农历六月初六，晒经会/庙会',reminderDays:1,color:'#2980b9',category:'庙会'}
+  ]
+};
+let config=load();
+function load(){
+  try{const s=localStorage.getItem(STORE_KEY);if(s)return JSON.parse(s);}catch(e){}
+  return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+}
+function save(){localStorage.setItem(STORE_KEY,JSON.stringify(config));}
+
+const PRESET=['#e74c3c','#27ae60','#2980b9','#8e44ad','#f39c12','#16a085','#c0392b','#2c3e50'];
+const REMIND_TXT={0:'不提醒',1:'提前1天',2:'提前2天',3:'提前3天',7:'提前1周'};
+
+/* ---------- DOM ---------- */
+const $=id=>document.getElementById(id);
+function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800);}
+function genId(){return 'evt-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+
+function initMonthSelect(){
+  const sel=$('evMonth');sel.innerHTML='';
+  for(let m=1;m<=12;m++){const o=document.createElement('option');o.value=m;o.textContent=cnMonth(m);sel.appendChild(o);}
+}
+function renderSwatches(){
+  const box=$('swatches');box.innerHTML='';
+  PRESET.forEach(c=>{const s=document.createElement('div');s.className='sw';s.style.background=c;
+    s.onclick=()=>{$('evColor').value=c;markSwatch();};box.appendChild(s);});
+  markSwatch();
+}
+function markSwatch(){const cur=$('evColor').value.toLowerCase();
+  [...$('swatches').children].forEach(s=>s.classList.toggle('active',s.style.background&&rgbToHex(s.style.background)===cur));}
+function rgbToHex(rgb){const m=rgb.match(/\d+/g);if(!m)return rgb;return '#'+m.slice(0,3).map(x=>(+x).toString(16).padStart(2,'0')).join('');}
+
+function renderSettings(){
+  $('calName').value=config.calendar.name||'';
+  $('calDesc').value=config.calendar.description||'';
+  $('startYear').value=config.calendar.startYear||'';
+  $('endYear').value=config.calendar.endYear||'';
+}
+function readSettings(){
+  config.calendar.name=$('calName').value.trim()||'阴历庙会与节日';
+  config.calendar.description=$('calDesc').value.trim();
+  const sy=parseInt($('startYear').value,10),ey=parseInt($('endYear').value,10);
+  if(sy>=1900&&sy<=2100)config.calendar.startYear=sy;
+  if(ey>=1900&&ey<=2100)config.calendar.endYear=ey;
+  if(config.calendar.endYear<config.calendar.startYear)config.calendar.endYear=config.calendar.startYear+50;
+}
+
+function renderEvents(){
+  const body=$('evBody');body.innerHTML='';
+  $('evCount').textContent=config.events.length;
+  $('evEmpty').style.display=config.events.length?'none':'block';
+  config.events.forEach(ev=>{
+    const tr=document.createElement('tr');
+    const label=dateLabel(ev);
+    tr.innerHTML=`<td><b>${esc(ev.name)}</b></td>
+      <td>${label}</td>
+      <td>${esc(ev.category||'-')}</td>
+      <td>${REMIND_TXT[ev.reminderDays]||'不提醒'}</td>
+      <td><span class="dot" style="background:${ev.color||'#999'}"></span></td>
+      <td>
+        <button class="ghost sm" data-edit="${ev.id}">编辑</button>
+        <button class="danger sm" data-del="${ev.id}">删除</button>
+      </td>`;
+    body.appendChild(tr);
+  });
+  body.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editEvent(b.dataset.edit));
+  body.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>delEvent(b.dataset.del));
+}
+
+function renderPreview(){
+  const box=$('preview');box.innerHTML='';
+  const thisYear=new Date().getFullYear();
+  const sy=Math.max(config.calendar.startYear||thisYear,thisYear);
+  const ey=config.calendar.endYear||(sy+50);
+  if(!config.events.length){box.innerHTML='<div class="skip">暂无事件。</div>';return;}
+  config.events.forEach(ev=>{
+    const item=document.createElement('div');item.className='preview-item';
+    const isLunar=(ev.type||'lunar')==='lunar';
+    const label=dateLabel(ev);
+    let html=`<div class="t"><span class="dot" style="background:${ev.color||'#999'}"></span>${esc(ev.name)} · ${label}</div>`;
+    const dates=[];let skipped=0;
+    for(let y=sy;y<=ey&&dates.length<10;y++){
+      const sd=isLunar?lunarToSolar(y,ev.month,ev.day,ev.leap):solarToDate(y,ev.month,ev.day);
+      if(!sd){skipped++;continue;}
+      dates.push(`<span class="chip">${sd.y}年${sd.m}月${sd.d}日 周${weekday(sd)}</span>`);
+    }
+    html+='<div class="dates">'+dates.join('')+'</div>';
+    if(skipped)html+=`<div class="skip">（其中 ${skipped} 年因无此闰月/日期已跳过）</div>`;
+    item.innerHTML=html;box.appendChild(item);
+  });
+}
+
+function refreshAll(){readSettings();save();renderEvents();renderPreview();}
+
+/* ---------- 表单操作 ---------- */
+function resetForm(){ $('editId').value='';$('formTitle').textContent='新增事件';
+  $('evName').value='';$('evCat').value='';$('evType').value='lunar';toggleTypeUI();
+  $('evMonth').value=1;$('evDay').value=15;
+  $('evLeap').checked=false;$('evRemind').value=1;$('evDesc').value='';$('evColor').value='#e74c3c';markSwatch();}
+
+function toggleTypeUI(){
+  const solar=$('evType').value==='solar';
+  $('leapRow').style.display=solar?'none':'flex';
+  $('evDay').max=solar?31:30;
+  const dv=parseInt($('evDay').value,10);
+  if(solar&&dv>31)$('evDay').value=31;
+  if(!solar&&dv>30)$('evDay').value=30;
+}
+
+function editEvent(id){
+  const ev=config.events.find(e=>e.id===id);if(!ev)return;
+  $('editId').value=id;$('formTitle').textContent='编辑：'+ev.name;
+  $('evName').value=ev.name;$('evCat').value=ev.category||'';
+  $('evType').value=ev.type||'lunar';toggleTypeUI();
+  $('evMonth').value=ev.month;$('evDay').value=ev.day;$('evLeap').checked=!!ev.leap;
+  $('evRemind').value=String(ev.reminderDays||0);$('evDesc').value=ev.description||'';
+  $('evColor').value=ev.color||'#e74c3c';markSwatch();
+  $('formCard').scrollIntoView({behavior:'smooth'});
+}
+function delEvent(id){
+  const btns=[...document.querySelectorAll('[data-del]')];
+  const btn=btns.find(b=>b.dataset.del===id);
+  const others=btns.filter(b=>b!==btn);
+  if(btn && btn.dataset.armed==='1'){
+    config.events=config.events.filter(e=>e.id!==id);refreshAll();toast('已删除');
+    return;
+  }
+  others.forEach(b=>{b.dataset.armed='0';b.textContent='删除';});
+  if(btn){
+    btn.dataset.armed='1';btn.textContent='确认删除?';
+    setTimeout(()=>{if(btn.dataset.armed==='1'){btn.dataset.armed='0';btn.textContent='删除';}},2500);
+  }
+}
+function saveEvent(){
+  const name=$('evName').value.trim();
+  if(!name){toast('请填写名称');return;}
+  const type=$('evType').value;
+  let month=parseInt($('evMonth').value,10);let day=parseInt($('evDay').value,10);
+  if(!(month>=1&&month<=12)){toast('月份需在 1-12');return;}
+  const maxDay=type==='solar'?31:30;
+  if(!(day>=1&&day<=maxDay)){toast('日期需在 1-'+maxDay);return;}
+  const leap=type==='lunar'?$('evLeap').checked:false;
+  const data={name,category:$('evCat').value.trim(),type,month,day,leap,
+    description:$('evDesc').value.trim(),reminderDays:parseInt($('evRemind').value,10),
+    color:$('evColor').value};
+  const id=$('editId').value;
+  if(id){const i=config.events.findIndex(e=>e.id===id);if(i>=0)config.events[i]={...config.events[i],...data};toast('已保存');}
+  else{config.events.push({id:genId(),...data});toast('已添加');}
+  resetForm();refreshAll();
+}
+function clearAll(){
+  if(!confirm('确定清空全部事件？此操作不可撤销（配置也会清空）。'))return;
+  config.events=[];refreshAll();toast('已清空');
+}
+
+/* ---------- 生成 / 导出 / 导入 ---------- */
+function download(filename,text,mime){
+  const blob=new Blob([text],{type:mime||'text/plain;charset=utf-8'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url;a.download=filename;document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+function buildCurrentICS(){
+  readSettings();save();
+  return buildICS(config);
+}
+function generateICS(){
+  const {ics,count}=buildCurrentICS();
+  download('lunar_events.ics',ics,'text/calendar;charset=utf-8');
+  toast('已生成 '+count+' 个日程，开始下载');
+  return ics;
+}
+function exportJSON(){
+  readSettings();save();
+  download('lunar-config.json',JSON.stringify(config,null,2),'application/json');
+  toast('已导出配置');
+}
+function importJSON(file){
+  const r=new FileReader();
+  r.onload=()=>{try{const c=JSON.parse(r.result);
+    if(!c.calendar)c.calendar={};if(!Array.isArray(c.events))c.events=[];
+    config=c;save();renderSettings();refreshAll();toast('已导入配置');}
+    catch(e){toast('JSON 解析失败');}};
+  r.readAsText(file);
+}
+
+/* ---------- 绑定 ---------- */
+initMonthSelect();renderSwatches();renderSettings();renderEvents();renderPreview();toggleTypeUI();
+$('evColor').addEventListener('input',markSwatch);
+$('evType').addEventListener('change',toggleTypeUI);
+$('saveBtn').onclick=saveEvent;
+$('resetBtn').onclick=resetForm;
+$('genBtn').onclick=generateICS;
+$('copyBtn').onclick=()=>{const {ics}=buildCurrentICS();if(navigator.clipboard)navigator.clipboard.writeText(ics).then(()=>toast('已复制 .ics 内容')).catch(()=>toast('复制失败，请手动下载'));else toast('当前浏览器不支持复制，请改用下载');};
+$('exportBtn').onclick=exportJSON;
+$('importBtn').onclick=()=>$('importFile').click();
+$('importFile').onchange=e=>{if(e.target.files[0])importJSON(e.target.files[0]);e.target.value='';};
+$('clearAllBtn').onclick=clearAll;
+['calName','calDesc','startYear','endYear'].forEach(id=>$(id).addEventListener('change',()=>{readSettings();save();renderPreview();}));
+</script>
+</body>
+</html>

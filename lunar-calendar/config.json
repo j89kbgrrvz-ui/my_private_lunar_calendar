@@ -1,0 +1,43 @@
+{
+  "calendar": {
+    "name": "阴历庙会与节日",
+    "description": "由 WorkBuddy 生成的阴历日期日历订阅，可手动增删改。",
+    "startYear": 2024,
+    "endYear": 2074
+  },
+  "events": [
+    {
+      "id": "miaohui-yuanxiao",
+      "name": "元宵庙会",
+      "month": 1,
+      "day": 15,
+      "leap": false,
+      "description": "农历正月十五，元宵节庙会",
+      "reminderDays": 1,
+      "color": "#e74c3c",
+      "category": "庙会"
+    },
+    {
+      "id": "miaohui-sanyue-san",
+      "name": "三月三庙会",
+      "month": 3,
+      "day": 3,
+      "leap": false,
+      "description": "农历三月初三，上巳节庙会",
+      "reminderDays": 1,
+      "color": "#27ae60",
+      "category": "庙会"
+    },
+    {
+      "id": "miaohui-liuyue-liu",
+      "name": "六月六庙会",
+      "month": 6,
+      "day": 6,
+      "leap": false,
+      "description": "农历六月初六，晒经会/庙会",
+      "reminderDays": 1,
+      "color": "#2980b9",
+      "category": "庙会"
+    }
+  ]
+}
